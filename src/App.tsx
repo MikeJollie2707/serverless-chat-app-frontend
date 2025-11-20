@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
+import "./App.css";
 
 export default function App() {
   const { sendJsonMessage, readyState, lastMessage } = useWebSocket(
@@ -8,14 +9,27 @@ export default function App() {
       share: true,
     }
   );
+
   const messageRef = useRef<HTMLInputElement | null>(null);
-  const [messageHistory, setMessageHistory] = useState<MessageEvent<any>[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [messageHistory, setMessageHistory] = useState<any[]>([]);
 
   useEffect(() => {
     if (lastMessage !== null) {
-      setMessageHistory((prev) => prev.concat(lastMessage));
+      // try to parse JSON messages, but fall back to raw data
+      let parsed: any = lastMessage.data;
+      try {
+        parsed = JSON.parse(lastMessage.data);
+      } catch (e) {
+        // not JSON
+      }
+      setMessageHistory((prev) => prev.concat({ ...parsed, _raw: lastMessage.data }));
     }
   }, [lastMessage]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messageHistory]);
 
   const connectionStatus = {
     [ReadyState.CONNECTING]: "Connecting",
@@ -26,30 +40,68 @@ export default function App() {
   }[readyState];
 
   const handleClickSendMessage = () => {
-    console.log(messageRef.current?.value);
-    if (messageRef.current?.value) {
-      sendJsonMessage({
-        action: "sendmessage",
-        message: messageRef.current.value,
-      });
-      messageRef.current.value = "";
+    const text = messageRef.current?.value?.trim();
+    if (!text) return;
+
+    // send to server
+    sendJsonMessage({ action: "sendmessage", message: text });
+
+    // show optimistic local echo
+    setMessageHistory((prev) => prev.concat({ message: text, self: true, ts: Date.now() }));
+
+    if (messageRef.current) messageRef.current.value = "";
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleClickSendMessage();
     }
   };
 
   return (
-    <div>
-      <form onSubmit={(e) => e.preventDefault()}>
-        <input type="text" ref={messageRef}></input>
-        <button onClick={handleClickSendMessage}>Send</button>
-      </form>
-      <span>The WebSocket is currently {connectionStatus}</span>
-      <ul>
-        {messageHistory.map((message, idx) => (
-          <span className="flex flex-col gap-2" key={idx}>
-            {message ? message.data : null}
-          </span>
-        ))}
-      </ul>
+    <div className="app-root">
+      <header className="app-header">
+        <div className="title">Serverless Chat</div>
+        <div className="status">
+          <span className={`status-dot ${connectionStatus === "Open" ? "open" : "closed"}`}></span>
+          <span className="status-text">{connectionStatus}</span>
+        </div>
+      </header>
+
+      <main className="chat-card">
+        <section className="messages" aria-live="polite">
+          {messageHistory.length === 0 && (
+            <div className="empty">No messages yet — say hi 👋</div>
+          )}
+
+          {messageHistory.map((m, idx) => {
+            const text = typeof m === "string" ? m : m.message ?? m._raw ?? String(m);
+            const isSelf = !!m.self;
+            return (
+              <div key={idx} className={`message ${isSelf ? "me" : "them"}`}>
+                <div className="bubble">{text}</div>
+              </div>
+            );
+          })}
+
+          <div ref={messagesEndRef} />
+        </section>
+
+        <form className="composer" onSubmit={(e) => e.preventDefault()}>
+          <input
+            className="input"
+            type="text"
+            placeholder="Type a message and press Enter..."
+            ref={messageRef}
+            onKeyDown={onKeyDown}
+            aria-label="Message input"
+          />
+          <button type="button" className="send-button" onClick={handleClickSendMessage} aria-label="Send">
+            Send
+          </button>
+        </form>
+      </main>
     </div>
   );
 }
