@@ -72,7 +72,7 @@ export default function App() {
       <main className="chat-card">
         <section className="messages" aria-live="polite">
           {messageHistory.length === 0 && (
-            <div className="empty">No messages yet — say hi 👋</div>
+            <div className="empty">No messages yet</div>
           )}
 
           {messageHistory.map((m, idx) => {
