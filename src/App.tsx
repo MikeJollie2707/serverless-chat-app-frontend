@@ -1,89 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import "./App.css";
-
-// ------------------ CONFIG ------------------
-const COGNITO_DOMAIN = "us-west-18viyeff6a.auth.us-west-1.amazoncognito.com";
-const CLIENT_ID = "75j3nmcht7m5v97vvrvsqvi05h";
-const REDIRECT_URI = "http://localhost:5173/";
-
-// ------------------ PKCE HELPERS ------------------
-function base64UrlEncode(arrayBuffer: ArrayBuffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-async function generatePKCE() {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const codeVerifier = base64UrlEncode(array.buffer);
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(codeVerifier)
-  );
-  const codeChallenge = base64UrlEncode(digest);
-  return { codeVerifier, codeChallenge };
-}
-
-// ------------------ AUTH FUNCTIONS ------------------
-async function login() {
-  const { codeVerifier, codeChallenge } = await generatePKCE();
-  sessionStorage.setItem("pkce_verifier", codeVerifier);
-
-  const url =
-    `https://${COGNITO_DOMAIN}/oauth2/authorize?response_type=code` +
-    `&client_id=${CLIENT_ID}` +
-    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&code_challenge_method=S256` +
-    `&code_challenge=${codeChallenge}` +
-    `&scope=openid+email+profile`;
-
-  window.location.href = url;
-}
-
-async function exchangeCode(code: string) {
-  const verifier = sessionStorage.getItem("pkce_verifier");
-  if (!verifier) return;
-
-  const params = new URLSearchParams();
-  params.append("grant_type", "authorization_code");
-  params.append("client_id", CLIENT_ID);
-  params.append("code", code);
-  params.append("redirect_uri", REDIRECT_URI);
-  params.append("code_verifier", verifier);
-
-  const res = await fetch(`https://${COGNITO_DOMAIN}/oauth2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
-
-  const data = await res.json();
-  if (data.id_token) sessionStorage.setItem("id_token", data.id_token);
-
-  return data;
-}
-
-function logout() {
-  sessionStorage.clear();
-  window.location.href = "/";
-}
-
-function getIdToken() {
-  return sessionStorage.getItem("id_token");
-}
-
-// ------------------ JWT DECODING ------------------
-function parseJwt(token: string) {
-  try {
-    const payload = token.split(".")[1];
-    return JSON.parse(atob(payload));
-  } catch {
-    return null;
-  }
-}
+import { useAuth } from "react-oidc-context";
+import { jwtDecode, type JwtPayload } from "jwt-decode";
 
 // ------------------ EMAIL PARSING ------------------
 function parseEmailToName(email: string | null | undefined): string {
@@ -133,49 +52,29 @@ const parseMessage = (incoming: any): string => {
 
 // ------------------ APP COMPONENT ------------------
 export default function App() {
-  const [signedIn, setSignedIn] = useState(false);
-  const [idToken, setIdToken] = useState<string | null>(null);
-  const [readyToConnect, setReadyToConnect] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
+  const auth = useAuth();
+  const hasAccessToken = !!auth.user?.access_token;
 
-  // Handle OAuth2 redirect
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get("code");
-
-    if (code) {
-      exchangeCode(code).then((data) => {
-        if (data?.id_token) {
-          setIdToken(data.id_token);
-          setSignedIn(true);
-          setReadyToConnect(true);
-          const decoded = parseJwt(data.id_token);
-          if (decoded?.email) setEmail(decoded.email);
-          window.history.replaceState({}, "", "/"); // Clean URL
-        }
-      });
-    } else {
-      const token = getIdToken();
-      if (token) {
-        setIdToken(token);
-        setSignedIn(true);
-        setReadyToConnect(true);
-        const decoded = parseJwt(token);
-        if (decoded?.email) setEmail(decoded.email);
-      }
-    }
-  }, []);
+  const email = auth.user?.id_token
+    ? (jwtDecode(auth.user.id_token) as CognitoIDPayload).email
+    : "";
 
   // ------------------ WebSocket ------------------
   const { sendJsonMessage, lastMessage, readyState } = useWebSocket(
-    readyToConnect && idToken
-      ? `wss://ed0pa614ah.execute-api.us-west-1.amazonaws.com/production/?token=${idToken}`
-      : null,
+    `wss://ed0pa614ah.execute-api.us-west-1.amazonaws.com/production`,
     {
       share: true,
+      // This is sus, but the lib doesn't provide any other way to put
+      // token in the initial upgrade request
+      queryParams: {
+        token: auth.user?.access_token || "",
+      },
       shouldReconnect: () => true,
       onError: (event) => console.error("WebSocket error:", event),
-    }
+      reconnectAttempts: 3,
+    },
+    // Connect only when this is true
+    hasAccessToken
   );
 
   const [messageHistory, setMessageHistory] = useState<ChatEntry[]>([]);
@@ -228,7 +127,8 @@ export default function App() {
   };
 
   const isConnected = readyState === ReadyState.OPEN;
-  const isChatEnabled = signedIn && isConnected;
+  // WS only connects when user is auth so no need to check for auth
+  const isChatEnabled = isConnected;
 
   // ------------------ RENDER ------------------
   return (
@@ -238,10 +138,16 @@ export default function App() {
           <h1>Serverless Chat Platform for Learners</h1>
           {email && <p className="user-email">Logged in as: {email}</p>}
           <div className="status-pill">
-            <span className={`status-dot ${isChatEnabled ? "online" : "offline"}`} />
+            <span
+              className={`status-dot ${isConnected ? "online" : "offline"}`}
+            />
             <div>
               <p className="status-title">
-                {signedIn ? (isConnected ? "Connected" : "Connecting...") : "Disconnected"}
+                {hasAccessToken
+                  ? isConnected
+                    ? "Connected"
+                    : "Connecting..."
+                  : "Disconnected"}
               </p>
               <p className="status-subtitle">WebSocket connection</p>
             </div>
@@ -258,14 +164,25 @@ export default function App() {
           <button
             type="button"
             className="auth-button"
-            onClick={() => (signedIn ? logout() : login())}
+            onClick={async () => {
+              if (!hasAccessToken) {
+                await auth.signinRedirect();
+              } else
+                await auth.signoutRedirect({
+                  extraQueryParams: {
+                    client_id: auth.settings.client_id,
+                    logout_uri: "http://localhost:5173",
+                  },
+                });
+            }}
           >
-            {signedIn ? "Sign Out" : "Sign In"}
+            {hasAccessToken ? "Sign Out" : "Sign In"}
           </button>
         </header>
 
         <section className="chat-window">
-          {!signedIn && <div className="chat-overlay">Please log in to use the chat service</div>}
+          {!hasAccessToken && (
+            <div className="chat-overlay">Please log in to use the chat service</div>}
           {messageHistory.map((entry, idx) => (
             <article key={idx} className={`chat-bubble ${entry.self ? "self" : "bot"}`}>
               <div className="bubble-meta">

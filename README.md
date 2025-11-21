@@ -4,8 +4,9 @@
 
 - React
 - Vite
-- TailwindCSS
 - react-use-websocket
+- react-oidc-context + oidc-client-ts
+- jwt-decode
 
 ## Setup
 
