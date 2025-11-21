@@ -40,7 +40,8 @@ interface CognitoIDPayload extends JwtPayload {
   "cognito:username": string;
 }
 
-const parseMessage = (incoming: unknown): string => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const parseMessage = (incoming: any): string => {
   if (!incoming) return "";
   if (typeof incoming === "string") {
     try {
@@ -72,7 +73,7 @@ export default function App() {
 
   // ------------------ WebSocket ------------------
   const { sendJsonMessage, lastMessage, readyState } = useWebSocket(
-    `wss://ed0pa614ah.execute-api.us-west-1.amazonaws.com/production`,
+    import.meta.env.VITE_WSS_URL || "",
     {
       share: true,
       // This is sus, but the lib doesn't provide any other way to put

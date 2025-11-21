@@ -5,9 +5,9 @@ import App from "./App.tsx";
 import { AuthProvider, type AuthProviderProps } from "react-oidc-context";
 
 const oidcConfig: AuthProviderProps = {
-  authority: "https://cognito-idp.us-west-1.amazonaws.com/us-west-1_8vIYeff6a",
-  client_id: "75j3nmcht7m5v97vvrvsqvi05h",
-  redirect_uri: "http://localhost:5173",
+  authority: import.meta.env.VITE_COGNITO_AUTHORITY,
+  client_id: import.meta.env.VITE_COGNITO_CLIENT_ID,
+  redirect_uri: import.meta.env.VITE_COGNITO_REDIRECT_URL,
   response_type: "code",
 
   // Remove the payload in the URL
