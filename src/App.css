@@ -198,9 +198,16 @@
 .bubble-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
   font-size: 0.8rem;
   margin-bottom: 0.4rem;
   color: rgba(60, 49, 42, 0.65);
+}
+
+.sender-email {
+  font-weight: 600;
+  color: rgba(60, 49, 42, 0.85);
 }
 
 .chat-composer {
