@@ -7,28 +7,40 @@ import { jwtDecode, type JwtPayload } from "jwt-decode";
 // ------------------ EMAIL PARSING ------------------
 function parseEmailToName(email: string | null | undefined): string {
   if (!email) return "You";
-  
+
   // Check if email matches format: firstname.lastname@sjsu.edu
   const sjsuEmailPattern = /^([^.]+)\.([^@]+)@sjsu\.edu$/i;
   const match = email.match(sjsuEmailPattern);
-  
+
   if (match) {
     const firstName = match[1];
     const lastName = match[2];
     // Capitalize first letter of each name
-    const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
-    const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase();
+    const formattedFirstName =
+      firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    const formattedLastName =
+      lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase();
     return `${formattedFirstName} ${formattedLastName}`;
   }
-  
+
   // If not in expected format, return full email
   return email;
 }
 
 // ------------------ CHAT ------------------
-type ChatEntry = { message: string; ts: number; self: boolean; senderEmail?: string };
+type ChatEntry = {
+  message: string;
+  ts: number;
+  self: boolean;
+  senderEmail?: string;
+};
 
-const parseMessage = (incoming: any): string => {
+interface CognitoIDPayload extends JwtPayload {
+  email: string;
+  "cognito:username": string;
+}
+
+const parseMessage = (incoming: unknown): string => {
   if (!incoming) return "";
   if (typeof incoming === "string") {
     try {
@@ -48,7 +60,6 @@ const parseMessage = (incoming: any): string => {
   }
   return String(incoming);
 };
-
 
 // ------------------ APP COMPONENT ------------------
 export default function App() {
@@ -84,14 +95,11 @@ export default function App() {
   useEffect(() => {
     if (lastMessage) {
       const messageText = parseMessage(lastMessage.data);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessageHistory((prev) => {
         // Check if this is a duplicate of the last self message
         const lastEntry = prev[prev.length - 1];
-        if (
-          lastEntry &&
-          lastEntry.self &&
-          lastEntry.message === messageText
-        ) {
+        if (lastEntry && lastEntry.self && lastEntry.message === messageText) {
           // Skip duplicate - this is likely an echo of our own message
           return prev;
         }
@@ -182,11 +190,20 @@ export default function App() {
 
         <section className="chat-window">
           {!hasAccessToken && (
-            <div className="chat-overlay">Please log in to use the chat service</div>}
+            <div className="chat-overlay">
+              Please log in to use the chat service
+            </div>
+          )}
           {messageHistory.map((entry, idx) => (
-            <article key={idx} className={`chat-bubble ${entry.self ? "self" : "bot"}`}>
+            <article
+              key={idx}
+              className={`chat-bubble ${entry.self ? "self" : "bot"}`}
+            >
               <div className="bubble-meta">
-                <span className="sender-email">{entry.senderEmail || (entry.self ? parseEmailToName(email) : "Chat Bot")}</span>
+                <span className="sender-email">
+                  {entry.senderEmail ||
+                    (entry.self ? parseEmailToName(email) : "Chat Bot")}
+                </span>
                 <time>
                   {new Date(entry.ts).toLocaleTimeString([], {
                     hour: "2-digit",
