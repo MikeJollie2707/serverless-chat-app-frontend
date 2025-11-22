@@ -180,7 +180,7 @@ export default function App() {
                 await auth.signoutRedirect({
                   extraQueryParams: {
                     client_id: auth.settings.client_id,
-                    logout_uri: "http://localhost:5173",
+                    logout_uri: import.meta.env.VITE_COGNITO_REDIRECT_URL || "",
                   },
                 });
             }}
