@@ -22,3 +22,22 @@ git clone https://github.com/MikeJollie2707/serverless-chat-app-frontend.git .
 npm i
 npm run dev
 ```
+
+## Usage
+
+
+1. Not signed in — initial landing / sign-in prompt
+
+![Not signed in](./screenshots/1_not_signed_in.png)
+
+2. Signed in (Cognito) — authenticated view
+
+![Signed in (Cognito)](./screenshots/2_signed_in_cognito.png)
+
+3. App interface — main chat layout
+
+![App interface](./screenshots/3_app_interface.png)
+
+4. Messaging in action — sending/receiving messages
+
+![Messaging in action](./screenshots/4_messaging_in_action.png)
