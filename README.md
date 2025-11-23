@@ -1,9 +1,10 @@
 # serverless-chat-app-frontend
 
+The frontend for a WebSocket chat app.
+
 ## Dependencies
 
 - React
-- Vite
 - react-use-websocket
 - react-oidc-context + oidc-client-ts
 - jwt-decode
@@ -18,6 +19,7 @@
 ## Setup
 
 ```sh
+mkdir project && cd project
 git clone https://github.com/MikeJollie2707/serverless-chat-app-frontend.git .
 npm i
 npm run dev
@@ -28,16 +30,16 @@ npm run dev
 
 1. Not signed in — initial landing / sign-in prompt
 
-![Not signed in](./screenshots/1_not_signed_in.png)
+![On the left side, the title "Serverless Chat Platform for Learners. Under it is a "Disconnected" text, showing the WebSocket is not open. A "Please log in to use the chat service" overlay is on top of the chat menu. The "Send" button is disabled.](./screenshots/1_not_signed_in.png)
 
 2. Signed in (Cognito) — authenticated view
 
-![Signed in (Cognito)](./screenshots/2_signed_in_cognito.png)
+![The sign in interface of AWS Cognito with Email address and Password fields.](./screenshots/2_signed_in_cognito.png)
 
 3. App interface — main chat layout
 
-![App interface](./screenshots/3_app_interface.png)
+![Similar to Not signed in, but now WebSocket is showing "Connected" and the overlay doesn't exist. The "Send" button is enabled.](./screenshots/3_app_interface.png)
 
 4. Messaging in action — sending/receiving messages
 
-![Messaging in action](./screenshots/4_messaging_in_action.png)
+![Two messages, one from current client and another from a different user is shown.](./screenshots/4_messaging_in_action.png)
